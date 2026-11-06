@@ -1,70 +1,61 @@
-# PRD · Plataforma E-commerce Simplificada
+# PRD · Tienda Docker Rangers
 
-Equipo: docker-rangers · Integrantes: @Alin021002RJ, @Herjoru1, @DerekMstn114, @pablovaquerogit · Fecha: 10 de octubre de 2026
+Sistemas Distribuidos 2027-1 · Grupo 2. Integrantes: @Alin021002RJ, @Herjoru1, @DerekMstn114 y @pablovaquerogit. Actualización operativa del 6 de noviembre de 2026 sobre el PRD inicial del 10 de octubre; preparada por Pablo para revisión del equipo.
 
-## 1. Problema y usuarios
-Una plataforma básica de comercio electrónico para clientes que desean registrarse, consultar un catálogo de productos y realizar compras. El reto técnico central es garantizar que las transacciones y el inventario sean consistentes, evitando la venta de "inventario fantasma" en caso de fallas de red durante la creación de pedidos.
+## Problema y alcance
 
-## 2. Por qué es un sistema distribuido
-Las cargas de trabajo no son uniformes: los clientes realizan muchas más consultas de lectura al catálogo de productos que compras reales. Ser distribuido permite separar los módulos y escalar únicamente el servicio de Inventario (con múltiples réplicas) para soportar altos volúmenes de tráfico, ahorrando infraestructura al no tener que replicar toda una aplicación monolítica.
+Un cliente necesita registrarse, consultar productos, comprar cantidades disponibles y conocer el resultado de su pedido. El reto es impedir sobreventa y descuentos repetidos incluso con concurrencia, respuestas perdidas y reinicios entre servicios.
 
-## 3. Objetivos y lo que no vamos a hacer
-**Dentro del alcance:**
-- Registro y autenticación de clientes.
-- Consulta de catálogo de productos.
-- Realización de compras.
-- Consulta de estado del pedido.
+Incluye registro, sesiones de ocho horas, catálogo, compra directa de varios productos, precios congelados, consulta exclusiva del dueño, reservas, compensación y recuperación de pedidos pendientes. Fuera del alcance actual: pagos reales y mock de cobro, logística, direcciones, administración del catálogo, carrito persistente e interfaz web. La demostración usa HTTP y datos ficticios.
 
-**Fuera del alcance:**
-- Integraciones con pasarelas de pago reales (se utilizará un *mock*).
-- Sistemas complejos de logística, cálculos de flete y envíos.
-- Carritos de compras persistentes o complejos (se limitará a compra directa o carrito temporal en memoria del navegador).
+## Por qué distribuir
 
-## 4. El requisito que perseguimos y lo que dejamos atrás
-**Prioridad:** La Consistencia estricta de los datos (Enfoque CP). Garantizamos que bajo ninguna circunstancia se generará un pedido de un producto que no existe, asegurando que Inventario y Pedidos sean 100% exactos.
-**Lo que dejamos atrás:** La Disponibilidad al momento del pago. Estamos dispuestos a que el sistema rechace peticiones temporalmente, mostrando errores al cliente si hay fallos, antes de enfrentarnos a problemas logísticos de inventario que no poseemos.
+Se separa la propiedad de Usuarios, Inventario y Pedidos, y se replica solo la API de Inventario para practicar descubrimiento y balanceo. El prototipo comprueba reparto entre dos instancias. No demuestra todavía mayor capacidad ni que MongoDB supere PostgreSQL. Se acepta el costo de varias bases y recuperación de operaciones para estudiar el problema del curso.
 
-## 5. Historias de usuario
+## Reglas y sacrificios
 
-**Realizar compras**
-- *Como cliente autenticado, quiero realizar la compra de un producto del catálogo para asegurar que el artículo me sea asignado exitosamente y generar mi orden.*
-  - **Criterio de aceptación 1 (Consistencia):** Dado que intento comprar con stock disponible, Pedidos guarda el estado como "Confirmado" en PostgreSQL y el stock disminuye la cantidad solicitada en MongoDB.
-  - **Criterio de aceptación 2 (Rechazo):** Dado que intento comprar un producto con stock 0, la transacción se rechaza, devolviendo un error sin generar órdenes fantasmas en Pedidos.
-  - **Criterio de aceptación 3 (Idempotencia):** Dado que la red falla y Pedidos reintenta enviar la orden, Inventario valida la Idempotency Key (UUID), devuelve éxito, pero NO descuenta el stock por segunda vez.
+1. No confirmar una compra sin haber reservado y confirmado todos sus productos. No permitir stock negativo.
+2. Una llave de compra pertenece al usuario y a su contenido. Repetirla no crea otro pedido ni otro descuento; reutilizarla con otro contenido se rechaza.
+3. Un timeout deja un pedido PENDIENTE. El sistema no anuncia éxito ni devuelve stock a ciegas; conserva progreso y reintenta con las mismas llaves.
+4. Un rechazo de stock compensa reservas previas y conserva el intento como RECHAZADO. Al distribuir se pierde el rollback global del monolito: la compensación puede verse y tardar.
+5. Conservar precio y nombre de los productos al reservar, aunque el catálogo cambie después.
 
-**Consultar estado del pedido**
-- *Como cliente de la tienda, quiero consultar el estado de mis órdenes recientes para saber si mi intento de compra fue confirmado, está pendiente o fue rechazado por problemas de red o inventario.*
-  - **Criterio de aceptación 1 (Lectura Exitosa):** Dado que tengo una compra previa y consulto mi orden, el sistema devuelve detalles del producto, el precio congelado y su estado final.
-  - **Criterio de aceptación 2 (Aislamiento/Seguridad):** Dado que intento consultar el ID de orden que pertenece a otro cliente, el sistema deniega el acceso validando mi identidad contra el servicio de Usuarios.
+La prioridad es evitar confirmaciones incorrectas; se sacrifica respuesta final inmediata. No existe una transacción global ni una promesa de inventario y pedidos idénticos en cada instante. Bajo una falla permanente puede necesitarse conciliación manual.
 
-## 6. Del monolito a los servicios
-Si fuera un monolito, la aplicación se dividiría internamente en Usuarios, Inventario y Pedidos.
-Al partirlos como servicios independientes, la frontera y el dominio de datos queda así:
-- **Usuarios:** Único dueño de Clientes y Direcciones.
-- **Inventario:** Único dueño de Catalogo_Productos y Stock.
-- **Pedidos:** Único dueño de Ordenes y Detalles_Orden.
+## Historias y aceptación
 
-**Flujo y llamadas cruzadas:** Durante la compra, Pedidos valida identidad contra Usuarios (o vía token JWT) y hace un `POST /inventario/reservar` hacia Inventario. Si el stock se reserva exitosamente pero Pedidos falla internamente al guardar su orden en PostgreSQL, Pedidos ejecuta una transacción de compensación (`POST /inventario/devolver`) para evitar dejar bloqueado el artículo.
+| Historia | Criterio comprobable |
+| --- | --- |
+| Registrarme e iniciar sesión | Correo único, contraseña con sal/PBKDF2 y token aleatorio guardado como hash; sesión inválida devuelve 401 |
+| Consultar catálogo | Lista y detalle con ID, nombre, precio entero en centavos MXN y stock disponible |
+| Comprar | Con stock, termina CONFIRMADO; diez compras concurrentes con tres unidades producen tres confirmados y siete rechazados |
+| Reintentar compra | Cinco peticiones simultáneas con una llave producen un pedido; contenido distinto devuelve 409 |
+| Fallar a mitad | Si falta el segundo producto se devuelve la reserva del primero y termina RECHAZADO |
+| Recuperar | Con Inventario inaccesible queda PENDIENTE; reiniciar Pedidos y recuperar Inventario permite terminar sin descuento doble |
+| Consultar mis pedidos | Sin sesión 401, otro dueño 404; dueño obtiene detalles, historial y resultado |
 
-## 7. Dónde vive cada pieza
+## Fronteras y contratos
 
-| Pieza | Dónde vive | Por qué | Qué pasa si falla |
-|---|---|---|---|
-| **API gateway** | Nginx, Traefik, o código Node/Spring. | Para centralizar el tráfico como único punto de entrada público, ocultando la red interna y exponiendo rutas base como `/api/pedidos/*`. | Es un Punto Único de Fallo (SPOF). Si colapsa, la tienda queda fuera de servicio desde el exterior. |
-| **Directorio / DNS** | DNS interno nativo de Docker Compose. | Porque un directorio como Eureka sería sobreingeniería para nuestra arquitectura inicial de tres servicios. | Si Docker pierde la resolución de nombres, los servicios no pueden comunicarse internamente. |
-| **Balanceo** | Gateway (hacia el exterior) y el DNS interno de Docker (hacia el interior) con Round-Robin. | Para distribuir equitativamente el gran volumen de peticiones de lectura hacia las réplicas del Inventario. | Las peticiones pueden abrumar una sola réplica si el reparto falla. |
-| **Datos** (tipo de base) | Pedidos y Usuarios en SQL (PostgreSQL/MySQL). Inventario en NoSQL (MongoDB) con Read Replicas. | SQL por necesidad de transacciones ACID. NoSQL para acelerar lecturas masivas. Si a futuro hay Sharding, será por hash(ID_Producto). | Si el Maestro de MongoDB cae, fallarán los descuentos de stock; si cae PostgreSQL, no habrá compras procesables. |
-| **Operaciones entre servicios** | Orquestado desde Pedidos con transacciones de compensación. | Para deshacer operaciones si la transacción falla a la mitad, regresando los artículos virtualmente al estante. | Requiere monitoreo; si falla la compensación puede quedar inventario inconsistente. |
-| **Manejo de fallas** | Fail-fast: Timeout de 3 a 5s, reintentos (max 3), Circuit Breaker y Llaves de Idempotencia. | Para proteger la red, evitar bloqueos de interfaz al usuario y asegurar que los reintentos no cobren o descuenten de más. | Si la validación de idempotencia llegara a fallar, el inventario quedaría desajustado. |
+- Usuarios: clientes y sesiones, PostgreSQL propio. `/api/usuarios`, `/api/sesiones`, `/api/usuarios/me`.
+- Inventario: productos, stock y reservas por pedido, MongoDB propio. Lecturas `/api/productos`; operaciones internas autenticadas `/interno/productos/{id}/reservas` y `/{pedido_id}/{confirmar|liberar}`. La actualización de un documento une condición de stock, descuento y marca idempotente.
+- Pedidos: solicitud, llave, dueño, detalles congelados, estado, historial y progreso de saga, PostgreSQL propio. `/api/pedidos`. Verifica sesión con Usuarios y orquesta Inventario. Ningún servicio hace consultas directas a la base del otro.
 
-## 8. Stack y cómo se levanta
-- **Lenguaje y Framework:** Python con FastAPI. Elegido por su velocidad de desarrollo, validación automática de datos y la capacidad de autogenerar documentación interactiva (Swagger) para facilitar pruebas rápidas entre microservicios.
-- **Entorno Local y Despliegue:** Todo el ecosistema (Bases de datos SQL y MongoDB, Proxy Inverso y el código de los servicios) se levantará usando **Docker Compose**. Con un solo comando (`docker compose up`) se asegura que el entorno de desarrollo sea idéntico para todos, eliminando el problema de "en mi computadora sí funciona".
+El pedido se guarda antes de llamar a Inventario. Reservar con la misma pareja pedido/producto devuelve el resultado previo; confirmar y liberar también son idempotentes. Un trabajador reanuda estados PENDIENTE/COMPENSANDO al reiniciar. El estado REVISION_PENDIENTE muestra conflictos que necesitan intervención.
 
-## 9. Decisiones de arquitectura
-- *Consistencia (CP) sobre Disponibilidad:* Preferimos rechazar una petición devolviendo un error al cliente que generar falsas expectativas de compra.
-- *DNS nativo sobre Eureka:* Descartamos implementar un *Service Discovery* avanzado en favor de mayor simplicidad apoyándonos en la red de contenedores de Docker.
-- *Transacción de compensación vs Bloqueos:* Utilizamos un patrón reactivo (Saga) donde Pedidos lanza una orden de retorno de stock si falla internamente, minimizando candados pesados.
+## Piezas y operación
 
-## 10. Preguntas abiertas y desacuerdos
-- El equipo mantiene total acuerdo sobre el modelo, el enfoque estricto en la consistencia y la priorización de las réplicas de lectura en MongoDB. No hay preguntas abiertas.
+| Pieza | Decisión y falla |
+| --- | --- |
+| Gateway | Nginx, único puerto local 18091; su caída impide acceso exterior |
+| Directorio | DNS de Compose, resolución dinámica de Nginx; su falla afecta descubrimiento |
+| Balanceo | Nginx reparte hacia dos réplicas de API Inventario, también en llamadas internas |
+| Datos | Dos PostgreSQL independientes y un MongoDB; cada nodo único es un punto de falla, sin réplica de datos ni sharding |
+| Operaciones | Saga persistida en Pedidos, actualización atómica por producto y compensaciones; no hay broker/Outbox |
+| Fallas | Timeouts, circuit breaker y reintentos persistidos con espera; no reintentos ciegos del proxy |
+| Observación | X-Request-ID y logs JSON; sin recolector ni sistema de alertas |
+
+## Ejecución, evidencia y preguntas abiertas
+
+Python/FastAPI, PostgreSQL 17, MongoDB 8, Nginx 1.27.5 y Docker Compose. Desde `02-separacion`: `docker compose -f compose.distribuido.yml up --build -d --wait`; prueba real: `python3 tests/distribuido.py`. El [README](../README.md) y [diagrama](DECISIONES.md) detallan uso y resultados.
+
+La demo está implementada; el equipo debe revisar las decisiones y aportar trabajo propio. Quedan decisiones de operación para una evolución de producción: retención segura de reservas embebidas (límite de 16 MB), conciliación ante pérdida definitiva de Pedidos, respaldos, alta disponibilidad, TLS y límites de tráfico. No se declara acuerdo unánime ni rendimiento medido que no exista.
