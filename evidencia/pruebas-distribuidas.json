@@ -1,0 +1,241 @@
+{
+  "balanceo": [
+    {
+      "instancia": "c7b739c35aa6",
+      "status": 200
+    },
+    {
+      "instancia": "2fcc53050ca4",
+      "status": 200
+    },
+    {
+      "instancia": "c7b739c35aa6",
+      "status": 200
+    },
+    {
+      "instancia": "2fcc53050ca4",
+      "status": 200
+    },
+    {
+      "instancia": "c7b739c35aa6",
+      "status": 200
+    },
+    {
+      "instancia": "2fcc53050ca4",
+      "status": 200
+    },
+    {
+      "instancia": "c7b739c35aa6",
+      "status": 200
+    },
+    {
+      "instancia": "2fcc53050ca4",
+      "status": 200
+    }
+  ],
+  "idempotencia_concurrente": {
+    "pedido": {
+      "status": 200,
+      "body": {
+        "id": "daff0a3a-f8de-4783-aa4c-7e14810d3390",
+        "items": [
+          {
+            "nombre": "Producto de prueba",
+            "reserva": "CONFIRMADA",
+            "cantidad": 1,
+            "producto_id": "idempotencia-5eeda0e3",
+            "precio_centavos": 1234
+          }
+        ],
+        "estado": "CONFIRMADO",
+        "motivo": null,
+        "total_centavos": 1234,
+        "creado_en": "2026-11-06T12:20:36.727152+00:00",
+        "actualizado_en": "2026-11-06T12:20:36.765475+00:00",
+        "historial": [
+          {
+            "fecha": "2026-11-06T12:20:36.730313+00:00",
+            "estado": "PENDIENTE"
+          },
+          {
+            "fecha": "2026-11-06T12:20:36.751915+00:00",
+            "estado": "PENDIENTE"
+          },
+          {
+            "fecha": "2026-11-06T12:20:36.764249+00:00",
+            "estado": "PENDIENTE"
+          },
+          {
+            "fecha": "2026-11-06T12:20:36.765320+00:00",
+            "estado": "CONFIRMADO"
+          }
+        ]
+      },
+      "instancia": "245bf0428ee9",
+      "trace_id": "bb0f7a1d-f810-4ed4-9742-803d9874e943"
+    },
+    "stock": 4,
+    "intentos": 5
+  },
+  "sin_sobreventa": {
+    "estados": [
+      "CONFIRMADO",
+      "RECHAZADO",
+      "RECHAZADO",
+      "CONFIRMADO",
+      "CONFIRMADO",
+      "RECHAZADO",
+      "RECHAZADO",
+      "RECHAZADO",
+      "RECHAZADO",
+      "RECHAZADO"
+    ],
+    "stock": 0
+  },
+  "compensacion": {
+    "pedido": {
+      "status": 200,
+      "body": {
+        "id": "66da13a6-652d-4dfe-bbac-696b800f7f84",
+        "items": [
+          {
+            "nombre": "Producto de prueba",
+            "reserva": "LIBERADA",
+            "cantidad": 2,
+            "producto_id": "comp-a-b4662398",
+            "precio_centavos": 1234
+          },
+          {
+            "cantidad": 1,
+            "producto_id": "comp-b-44245a24"
+          }
+        ],
+        "estado": "RECHAZADO",
+        "motivo": "Stock insuficiente: comp-b-44245a24",
+        "total_centavos": null,
+        "creado_en": "2026-11-06T12:20:38.233730+00:00",
+        "actualizado_en": "2026-11-06T12:20:38.261234+00:00",
+        "historial": [
+          {
+            "fecha": "2026-11-06T12:20:38.234242+00:00",
+            "estado": "PENDIENTE"
+          },
+          {
+            "fecha": "2026-11-06T12:20:38.245648+00:00",
+            "estado": "PENDIENTE"
+          },
+          {
+            "fecha": "2026-11-06T12:20:38.254537+00:00",
+            "estado": "COMPENSANDO"
+          },
+          {
+            "fecha": "2026-11-06T12:20:38.260617+00:00",
+            "estado": "COMPENSANDO"
+          },
+          {
+            "fecha": "2026-11-06T12:20:38.261108+00:00",
+            "estado": "RECHAZADO"
+          }
+        ]
+      },
+      "instancia": "245bf0428ee9",
+      "trace_id": "5b5c750a-c1dd-44ef-a03b-13d4c2493820"
+    },
+    "stock_restaurado": 5
+  },
+  "validacion_y_rutas_internas": "aprobadas",
+  "recuperacion_tras_reinicio": {
+    "antes": {
+      "status": 202,
+      "body": {
+        "id": "785f89b2-b1e6-464a-a500-376dffaac991",
+        "items": [
+          {
+            "cantidad": 1,
+            "producto_id": "recuperacion-c64a1ddd"
+          }
+        ],
+        "estado": "PENDIENTE",
+        "motivo": "Inventario no respondió",
+        "total_centavos": null,
+        "creado_en": "2026-11-06T12:20:38.837955+00:00",
+        "actualizado_en": "2026-11-06T12:20:38.837955+00:00",
+        "historial": [
+          {
+            "fecha": "2026-11-06T12:20:38.838372+00:00",
+            "estado": "PENDIENTE"
+          }
+        ]
+      },
+      "instancia": "245bf0428ee9",
+      "trace_id": "dc423f2d-a821-454b-8861-80fa8072445c"
+    },
+    "despues_del_reinicio": {
+      "status": 200,
+      "body": {
+        "id": "785f89b2-b1e6-464a-a500-376dffaac991",
+        "items": [
+          {
+            "cantidad": 1,
+            "producto_id": "recuperacion-c64a1ddd"
+          }
+        ],
+        "estado": "PENDIENTE",
+        "motivo": "Inventario no respondió",
+        "total_centavos": null,
+        "creado_en": "2026-11-06T12:20:38.837955+00:00",
+        "actualizado_en": "2026-11-06T12:20:38.837955+00:00",
+        "historial": [
+          {
+            "fecha": "2026-11-06T12:20:38.838372+00:00",
+            "estado": "PENDIENTE"
+          }
+        ]
+      },
+      "instancia": "245bf0428ee9",
+      "trace_id": "8ff03c1e-c788-458e-9c2a-259d49c57f47"
+    },
+    "final": {
+      "status": 200,
+      "body": {
+        "id": "785f89b2-b1e6-464a-a500-376dffaac991",
+        "items": [
+          {
+            "nombre": "Producto de prueba",
+            "reserva": "CONFIRMADA",
+            "cantidad": 1,
+            "producto_id": "recuperacion-c64a1ddd",
+            "precio_centavos": 1234
+          }
+        ],
+        "estado": "CONFIRMADO",
+        "motivo": null,
+        "total_centavos": 1234,
+        "creado_en": "2026-11-06T12:20:38.837955+00:00",
+        "actualizado_en": "2026-11-06T12:20:45.087583+00:00",
+        "historial": [
+          {
+            "fecha": "2026-11-06T12:20:38.838372+00:00",
+            "estado": "PENDIENTE"
+          },
+          {
+            "fecha": "2026-11-06T12:20:45.067757+00:00",
+            "estado": "PENDIENTE"
+          },
+          {
+            "fecha": "2026-11-06T12:20:45.086440+00:00",
+            "estado": "PENDIENTE"
+          },
+          {
+            "fecha": "2026-11-06T12:20:45.087441+00:00",
+            "estado": "CONFIRMADO"
+          }
+        ]
+      },
+      "instancia": "245bf0428ee9",
+      "trace_id": "89fcd611-54ba-454e-9b91-41bf80e5d673"
+    },
+    "stock": 4
+  },
+  "fecha_utc": "2026-11-06T12:20:45Z"
+}

@@ -1,0 +1,85 @@
+name: docker-rangers-distribuido
+x-sql: &sql
+  image: postgres:17-alpine
+  environment:
+    POSTGRES_USER: tienda
+    POSTGRES_PASSWORD: ${DB_PASSWORD:-desarrollo-local}
+    POSTGRES_DB: tienda
+  healthcheck:
+    test: [CMD-SHELL, pg_isready -U tienda -d tienda]
+    interval: 3s
+    timeout: 3s
+    retries: 20
+x-api: &api
+  build:
+    context: .
+    dockerfile: Dockerfile.dist
+  healthcheck:
+    test: [CMD, python, -c, "import urllib.request; urllib.request.urlopen('http://localhost:8000/health')"]
+    interval: 5s
+    timeout: 4s
+    retries: 20
+services:
+  db-usuarios:
+    <<: *sql
+    volumes: [usuarios:/var/lib/postgresql/data]
+  db-pedidos:
+    <<: *sql
+    volumes: [pedidos:/var/lib/postgresql/data]
+  mongo:
+    image: mongo:8.0
+    volumes: [inventario:/data/db]
+    healthcheck:
+      test: [CMD-SHELL, "mongosh --quiet --eval 'db.adminCommand({ping:1}).ok' | grep -q 1"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+  usuarios:
+    <<: *api
+    command: [uvicorn, dist.usuarios_app:app, --host, 0.0.0.0, --port, '8000']
+    environment:
+      ROLE: usuarios
+      DATABASE_URL: postgresql+psycopg://tienda:${DB_PASSWORD:-desarrollo-local}@db-usuarios:5432/tienda
+    depends_on:
+      db-usuarios: {condition: service_healthy}
+  inventario:
+    <<: *api
+    command: [uvicorn, dist.inventario_app:app, --host, 0.0.0.0, --port, '8000']
+    environment:
+      ROLE: inventario
+      MONGO_URI: mongodb://mongo:27017/inventario?w=majority&journal=true
+      INTERNAL_KEY: ${INTERNAL_KEY:-llave-local-del-laboratorio}
+    deploy:
+      replicas: 2
+    depends_on:
+      mongo: {condition: service_healthy}
+  inventario-lb:
+    image: nginx:1.27.5-alpine
+    volumes: [./nginx/inventario-lb.conf:/etc/nginx/nginx.conf:ro]
+    depends_on:
+      inventario: {condition: service_healthy}
+  pedidos:
+    <<: *api
+    command: [uvicorn, dist.pedidos_app:app, --host, 0.0.0.0, --port, '8000']
+    environment:
+      ROLE: pedidos
+      DATABASE_URL: postgresql+psycopg://tienda:${DB_PASSWORD:-desarrollo-local}@db-pedidos:5432/tienda
+      USUARIOS_URL: http://usuarios:8000
+      INVENTARIO_URL: http://inventario-lb:8000
+      INTERNAL_KEY: ${INTERNAL_KEY:-llave-local-del-laboratorio}
+    depends_on:
+      db-pedidos: {condition: service_healthy}
+      usuarios: {condition: service_healthy}
+      inventario-lb: {condition: service_started}
+  gateway:
+    image: nginx:1.27.5-alpine
+    ports: ['127.0.0.1:${PUERTO_DISTRIBUIDO:-18091}:8000']
+    volumes: [./nginx/gateway.conf:/etc/nginx/nginx.conf:ro]
+    depends_on:
+      usuarios: {condition: service_healthy}
+      inventario: {condition: service_healthy}
+      pedidos: {condition: service_healthy}
+volumes:
+  usuarios:
+  pedidos:
+  inventario:
