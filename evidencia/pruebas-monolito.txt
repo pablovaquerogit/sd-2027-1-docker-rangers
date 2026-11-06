@@ -1,0 +1,79 @@
+ Container docker-rangers-db-test-1  Creating
+ Container docker-rangers-db-test-1  Created
+ Container docker-rangers-db-test-1  Starting
+ Container docker-rangers-db-test-1  Started
+#1 [internal] load local bake definitions
+#1 reading from stdin 675B done
+#1 DONE 0.0s
+
+#2 [internal] load build definition from Dockerfile
+#2 transferring dockerfile: 302B done
+#2 DONE 0.0s
+
+#3 [internal] load metadata for docker.io/library/python:3.12-slim
+#3 DONE 0.3s
+
+#4 [internal] load .dockerignore
+#4 transferring context: 82B done
+#4 DONE 0.0s
+
+#5 [1/7] FROM docker.io/library/python:3.12-slim@sha256:4840d514c583a4d3d8cad3940e68dee6f0f6f3635c12fcd0a3d74c21a5b93a54
+#5 resolve docker.io/library/python:3.12-slim@sha256:4840d514c583a4d3d8cad3940e68dee6f0f6f3635c12fcd0a3d74c21a5b93a54 0.0s done
+#5 DONE 0.0s
+
+#6 [internal] load build context
+#6 transferring context: 326B done
+#6 DONE 0.0s
+
+#7 [3/7] COPY requirements.txt .
+#7 CACHED
+
+#8 [5/7] COPY app app
+#8 CACHED
+
+#9 [6/7] COPY tests tests
+#9 CACHED
+
+#10 [2/7] WORKDIR /app
+#10 CACHED
+
+#11 [4/7] RUN pip install --no-cache-dir -r requirements.txt
+#11 CACHED
+
+#12 [7/7] RUN useradd --create-home tienda
+#12 CACHED
+
+#13 exporting to image
+#13 exporting layers done
+#13 exporting manifest sha256:627f43d48688693d890163ee20998c29738683dac182abd783b443bb71ad77f7 done
+#13 exporting config sha256:419c5fcb5df92c41110b9a37f8b46bd057f81c952c29592159736941ff3b3d7f done
+#13 exporting attestation manifest sha256:1bcd3333d00e4ca73fad39024687a105953b54b2c0a9ad20e8a8d11ced9a883f 0.1s done
+#13 exporting manifest list sha256:edbdd6c45fd7d75b610aec9dfa5adf5b6651a9a3e24980a1d20d524d4e74ea9b
+#13 exporting manifest list sha256:edbdd6c45fd7d75b610aec9dfa5adf5b6651a9a3e24980a1d20d524d4e74ea9b 0.0s done
+#13 naming to docker.io/library/docker-rangers-tests:latest done
+#13 unpacking to docker.io/library/docker-rangers-tests:latest 0.0s done
+#13 DONE 0.2s
+
+#14 resolving provenance for metadata file
+#14 DONE 0.0s
+============================= test session starts ==============================
+platform linux -- Python 3.12.16, pytest-8.3.3, pluggy-1.7.0 -- /usr/local/bin/python
+rootdir: /app
+plugins: anyio-4.16.0
+collecting ... collected 7 items
+
+tests/test_compras.py::test_reintento_no_descuenta_dos_veces_y_rechaza_cambio_de_payload PASSED [ 14%]
+tests/test_compras.py::test_concurrencia_no_sobrevende PASSED            [ 28%]
+tests/test_compras.py::test_misma_llave_concurrente_crea_un_solo_pedido PASSED [ 42%]
+tests/test_compras.py::test_pedido_ajeno_y_sin_sesion PASSED             [ 57%]
+tests/test_compras.py::test_compra_multilinea_fallida_no_reserva_stock_ni_crea_pedido PASSED [ 71%]
+tests/test_compras.py::test_precio_del_pedido_permanece_y_password_no_se_expone PASSED [ 85%]
+tests/test_compras.py::test_cantidades_invalidas_y_llave_ausente PASSED  [100%]
+
+=============================== warnings summary ===============================
+../usr/local/lib/python3.12/site-packages/starlette/testclient.py:40
+  /usr/local/lib/python3.12/site-packages/starlette/testclient.py:40: DeprecationWarning: The anyio.abc.BlockingPortal alias is deprecated, use anyio.from_thread.BlockingPortal instead.
+    _PortalFactoryType = typing.Callable[[], typing.ContextManager[anyio.abc.BlockingPortal]]
+
+-- Docs: https://docs.pytest.org/en/stable/how-to/capture-warnings.html
+========================= 7 passed, 1 warning in 0.83s =========================

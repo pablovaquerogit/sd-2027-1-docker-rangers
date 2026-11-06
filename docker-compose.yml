@@ -1,0 +1,54 @@
+name: docker-rangers
+services:
+  db:
+    image: postgres:17-alpine
+    environment:
+      POSTGRES_DB: tienda
+      POSTGRES_USER: tienda
+      POSTGRES_PASSWORD: ${DB_PASSWORD:-desarrollo-local}
+    volumes:
+      - datos:/var/lib/postgresql/data
+    healthcheck:
+      test: [CMD-SHELL, pg_isready -U tienda -d tienda]
+      interval: 3s
+      timeout: 3s
+      retries: 20
+  api:
+    build: .
+    ports:
+      - "127.0.0.1:${PUERTO_API:-18090}:8000"
+    environment:
+      DATABASE_URL: postgresql+psycopg://tienda:${DB_PASSWORD:-desarrollo-local}@db:5432/tienda
+    depends_on:
+      db:
+        condition: service_healthy
+    healthcheck:
+      test: [CMD, python, -c, "import urllib.request; urllib.request.urlopen('http://localhost:8000/health')"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+  tests:
+    build: .
+    profiles: [test]
+    command: [python, -m, pytest, -v, -p, no:cacheprovider, tests]
+    environment:
+      DATABASE_URL: postgresql+psycopg://tienda:pruebas@db-test:5432/tienda_test
+    depends_on:
+      db-test:
+        condition: service_healthy
+  db-test:
+    image: postgres:17-alpine
+    profiles: [test]
+    environment:
+      POSTGRES_DB: tienda_test
+      POSTGRES_USER: tienda
+      POSTGRES_PASSWORD: pruebas
+    tmpfs:
+      - /var/lib/postgresql/data
+    healthcheck:
+      test: [CMD-SHELL, pg_isready -U tienda -d tienda_test]
+      interval: 3s
+      timeout: 3s
+      retries: 20
+volumes:
+  datos:
