@@ -54,6 +54,20 @@ Requiere Python 3 estándar, Docker y el sistema ya levantado. Crea usuarios y p
 
 La prueba del reinicio detectó direcciones antiguas en el gateway. Nginx ahora usa DNS interno con `resolve`, memoria compartida y refresco de un segundo, para volver a descubrir servicios sin reiniciar el gateway. No se reintentan POST automáticamente desde el proxy; Pedidos controla los reintentos con identificadores estables.
 
+### Caída de una réplica de Inventario
+
+Con el entorno local levantado, ejecutar:
+
+```sh
+python3 tests/replica_inventario.py
+```
+
+El script consulta el catálogo a través del gateway y cuenta las respuestas por código HTTP y encabezado `X-Instancia`. Hace 16 consultas con las dos réplicas activas, detiene una y hace otras 16. Luego vuelve a iniciarla y comprueba el reparto con 16 consultas más. Conviene hacerlo sin otras demos simultáneas porque se detiene temporalmente un contenedor de Inventario.
+
+La prueba pasa si todas las consultas devuelven HTTP 200, la réplica activa atiende las consultas durante la caída y ambas vuelven a recibir tráfico al recuperarse. El alcance es la caída de una réplica de la API. Las dos dependen del mismo MongoDB.
+
+En la primera ejecución, una consulta devolvió HTTP 504 al intentar llegar a la réplica detenida. Se agregó un reintento interno en el gateway para los errores 502 y 504 del catálogo. Después del cambio, las 16 consultas durante la caída respondieron HTTP 200 desde la otra réplica. Al volver a levantar la primera, el tráfico se repartió otra vez. [Salida de la prueba](evidencia/prueba-replica-inventario.txt) · [Documentación de Nginx](https://nginx.org/en/docs/http/ngx_http_core_module.html#error_page).
+
 ## Límites que hay que defender
 
 Es una demo local con un único host, gateway, MongoDB y base por servicio: las réplicas de API **no** dan alta disponibilidad de los datos. MongoDB se eligió para practicar reservas atómicas por documento y un catálogo documental; no se midió que sea más rápido que PostgreSQL. No hay transacción global: catálogo, reservas y pedido pueden verse en estados intermedios.

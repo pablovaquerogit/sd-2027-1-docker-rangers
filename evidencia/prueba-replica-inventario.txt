@@ -1,0 +1,36 @@
+Antes del cambio en el gateway
+
+Catálogo: http://127.0.0.1:18091/api/productos
+Réplica que se detendrá: 40db42a50fbf
+Réplica que seguirá activa: cc5ad714b1a3
+
+Antes de la caída (16 consultas)
+   8 x HTTP 200 | X-Instancia: cc5ad714b1a3
+   8 x HTTP 200 | X-Instancia: 40db42a50fbf
+
+Con una réplica detenida (16 consultas)
+  15 x HTTP 200 | X-Instancia: cc5ad714b1a3
+   1 x HTTP 504 | X-Instancia: -
+
+Después de levantar la réplica (16 consultas)
+   8 x HTTP 200 | X-Instancia: cc5ad714b1a3
+   8 x HTTP 200 | X-Instancia: 40db42a50fbf
+
+Después del reintento interno en el catálogo
+
+Catálogo: http://127.0.0.1:18091/api/productos
+Réplica que se detendrá: 40db42a50fbf
+Réplica que seguirá activa: cc5ad714b1a3
+
+Antes de la caída (16 consultas)
+   8 x HTTP 200 | X-Instancia: cc5ad714b1a3
+   8 x HTTP 200 | X-Instancia: 40db42a50fbf
+
+Con una réplica detenida (16 consultas)
+  16 x HTTP 200 | X-Instancia: cc5ad714b1a3
+
+Después de levantar la réplica (16 consultas)
+   8 x HTTP 200 | X-Instancia: cc5ad714b1a3
+   8 x HTTP 200 | X-Instancia: 40db42a50fbf
+
+APROBADA: el catálogo siguió disponible y recuperó el reparto.
