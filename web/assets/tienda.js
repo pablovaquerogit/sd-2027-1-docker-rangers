@@ -28,6 +28,29 @@ const ESPERA_REINTENTO_MS = 2000;
 const LIMITE_REINTENTO_MS = 60 * 1000;
 const esFallaTemporal = (error) => !error.status || [502, 503, 504].includes(error.status);
 
+// Pedidos responde 503 "No se pudo verificar la sesión" cuando el que no contesta es Usuarios.
+const fallaDeUsuarios = (error) => error.status === 503 && /verificar la sesi/i.test(error.message);
+const codigo = (error) => (error.status ? "HTTP " + error.status : "sin conexión");
+function quienNoResponde(error, servicio) {
+  return fallaDeUsuarios(error) ? "Usuarios no responde: no se puede verificar tu sesión" : servicio + " no responde";
+}
+
+// Repite una acción mientras la falla sea temporal (sin conexión, 502, 503, 504), hasta LIMITE_REINTENTO_MS.
+async function conReintentos(accion, avisar) {
+  const inicio = Date.now();
+  let intento = 1;
+  while (true) {
+    try {
+      return await accion(intento);
+    } catch (error) {
+      if (!esFallaTemporal(error) || Date.now() - inicio >= LIMITE_REINTENTO_MS) throw error;
+      avisar(error, intento);
+      intento++;
+      await esperar(ESPERA_REINTENTO_MS);
+    }
+  }
+}
+
 async function solicitar(url, { body, sesion = "", clave = "" } = {}) {
   const headers = { Accept: "application/json" };
   if (body) headers["Content-Type"] = "application/json";
@@ -122,7 +145,10 @@ async function cargarPedidos() {
     pedidos.replaceChildren(...datos.map(pedidoEnLista));
     estado.textContent = datos.length ? "" : "Todavía no tienes pedidos.";
   } catch (error) {
-    if (sesion === token) estado.textContent = error.message;
+    if (sesion !== token) return;
+    estado.textContent = fallaDeUsuarios(error)
+      ? quienNoResponde(error, "Pedidos") + ". Intenta de nuevo en unos segundos."
+      : error.message;
   } finally {
     actualizarPedidos.disabled = false;
   }
@@ -196,12 +222,11 @@ async function comprar(producto, cantidad, boton) {
         const temporal = esFallaTemporal(error);
         if (!temporal || Date.now() - inicio >= LIMITE_REINTENTO_MS) {
           // La llave se conserva: si el usuario vuelve a presionar "Comprar", no se crea una compra doble.
-          estadoCompra.textContent = error.message
-            + (temporal ? " · Pedidos sigue sin responder. Vuelve a intentar: se usará la misma llave y no se cobrará doble." : "");
+          estadoCompra.textContent = (fallaDeUsuarios(error) ? quienNoResponde(error, "Pedidos") : error.message)
+            + (temporal ? " · Sigue sin responder. Vuelve a intentar: se usará la misma llave y no se cobrará doble." : "");
           return;
         }
-        estadoCompra.textContent = "Pedidos no responde ("
-          + (error.status ? "HTTP " + error.status : "sin conexión")
+        estadoCompra.textContent = quienNoResponde(error, "Pedidos") + " (" + codigo(error)
           + "); reintentando con la misma llave · intento " + intento + "…";
         intento++;
         await esperar(ESPERA_REINTENTO_MS);
@@ -238,22 +263,40 @@ formularioAcceso.addEventListener("submit", async (evento) => {
   const modo = buscar("#modo-acceso");
   const campos = new FormData(formularioAcceso);
   const login = { correo: campos.get("correo"), password: campos.get("password") };
+  const aviso = buscar("#acceso-estado");
+  const avisar = (error, intento) => {
+    aviso.textContent = "Usuarios no responde (" + codigo(error) + "); reintentando · intento " + intento + "…";
+  };
   boton.disabled = true;
   modo.disabled = true;
   try {
     if (registro) {
-      await solicitar("/api/usuarios", { body: { ...login, nombre: campos.get("nombre") } });
+      let reintento = false;
+      try {
+        await conReintentos((intento) => {
+          reintento = intento > 1;
+          return solicitar("/api/usuarios", { body: { ...login, nombre: campos.get("nombre") } });
+        }, avisar);
+      } catch (error) {
+        // El registro no es idempotente: si un intento anterior sí creó la cuenta pero su respuesta se
+        // perdió, el reintento recibe 409 "correo ya registrado". Se sigue con el inicio de sesión;
+        // si la cuenta fuera de otra persona, la contraseña no coincidirá y el servidor responderá 401.
+        if (!(reintento && error.status === 409)) throw error;
+      }
       mostrarModo(false);
     }
-    const { datos } = await solicitar("/api/sesiones", { body: login });
+    const { datos } = await conReintentos(() => solicitar("/api/sesiones", { body: login }), avisar);
     token = datos.access_token;
+    aviso.textContent = "";
     botonSesion.textContent = "Cerrar sesión";
     actualizarPedidos.hidden = false;
     formularioAcceso.reset();
     acceso.close();
     await cargarPedidos();
   } catch (error) {
-    buscar("#acceso-estado").textContent = error.message;
+    aviso.textContent = esFallaTemporal(error)
+      ? "Usuarios sigue sin responder (" + codigo(error) + "). Intenta de nuevo en unos segundos."
+      : error.message;
   } finally {
     boton.disabled = false;
     modo.disabled = false;
