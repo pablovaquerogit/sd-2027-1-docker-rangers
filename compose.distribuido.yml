@@ -1,6 +1,8 @@
 name: docker-rangers-distribuido
 x-sql: &sql
   image: postgres:17-alpine
+  # Si el proceso se cae, Docker lo vuelve a levantar solo (no aplica a docker compose stop).
+  restart: unless-stopped
   environment:
     POSTGRES_USER: tienda
     POSTGRES_PASSWORD: ${DB_PASSWORD:-desarrollo-local}
@@ -11,6 +13,9 @@ x-sql: &sql
     timeout: 3s
     retries: 20
 x-api: &api
+  # Si el proceso se cae (por ejemplo Pedidos), Docker lo vuelve a levantar solo; el trabajador
+  # de la saga retoma al arrancar los pedidos PENDIENTE/COMPENSANDO guardados en su base.
+  restart: unless-stopped
   build:
     context: .
     dockerfile: Dockerfile.dist
@@ -28,6 +33,7 @@ services:
     volumes: [pedidos:/var/lib/postgresql/data]
   mongo:
     image: mongo:8.0
+    restart: unless-stopped
     volumes: [inventario:/data/db]
     healthcheck:
       test: [CMD-SHELL, "mongosh --quiet --eval 'db.adminCommand({ping:1}).ok' | grep -q 1"]
@@ -55,6 +61,7 @@ services:
       mongo: {condition: service_healthy}
   inventario-lb:
     image: nginx:1.27.5-alpine
+    restart: unless-stopped
     volumes: [./nginx/inventario-lb.conf:/etc/nginx/nginx.conf:ro]
     depends_on:
       inventario: {condition: service_healthy}
@@ -73,6 +80,7 @@ services:
       inventario-lb: {condition: service_started}
   gateway:
     image: nginx:1.27.5-alpine
+    restart: unless-stopped
     ports: ['127.0.0.1:${PUERTO_DISTRIBUIDO:-18091}:8000']
     volumes:
       - ./nginx/gateway.conf:/etc/nginx/nginx.conf:ro

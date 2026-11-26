@@ -21,6 +21,13 @@ const LIMITE_SEGUIMIENTO_MS = 3 * 60 * 1000;
 let seguimiento = 0;
 const esperar = (ms) => new Promise((listo) => setTimeout(listo, ms));
 
+// Reintento de la compra cuando Pedidos no responde (caído o reiniciándose). Se reintenta con la
+// MISMA Idempotency-Key: si la primera petición sí llegó a guardarse, el servidor devuelve ese mismo
+// pedido en lugar de crear otro.
+const ESPERA_REINTENTO_MS = 2000;
+const LIMITE_REINTENTO_MS = 60 * 1000;
+const esFallaTemporal = (error) => !error.status || [502, 503, 504].includes(error.status);
+
 async function solicitar(url, { body, sesion = "", clave = "" } = {}) {
   const headers = { Accept: "application/json" };
   if (body) headers["Content-Type"] = "application/json";
@@ -36,7 +43,9 @@ async function solicitar(url, { body, sesion = "", clave = "" } = {}) {
     const mensaje = typeof datos?.detail === "string"
       ? datos.detail
       : "La solicitud falló (HTTP " + respuesta.status + ").";
-    throw new Error(mensaje);
+    const error = new Error(mensaje);
+    error.status = respuesta.status;
+    throw error;
   }
   if (!datos) throw new Error("Respuesta inesperada del servidor.");
   return { datos, respuesta };
@@ -164,24 +173,41 @@ async function comprar(producto, cantidad, boton) {
   const compra = { items: [{ producto_id: producto.id, cantidad }] };
   const contenido = JSON.stringify(compra);
   if (!clavesPorCompra.has(contenido)) clavesPorCompra.set(contenido, crypto.randomUUID());
+  const clave = clavesPorCompra.get(contenido);
   comprando = true;
   boton.disabled = true;
   estadoCompra.textContent = "Enviando pedido…";
+  const inicio = Date.now();
+  let intento = 1;
   try {
-    const { datos } = await solicitar("/api/pedidos", {
-      body: compra,
-      sesion,
-      clave: clavesPorCompra.get(contenido),
-    });
-    if (sesion !== token) return;
-    clavesPorCompra.delete(contenido);
-    seguimiento++;
-    estadoCompra.textContent = textoPedido(datos);
-    await Promise.all([cargarCatalogo(), cargarPedidos()]);
-    // 202 PENDIENTE: la compra quedó guardada y la saga sigue en el servidor. Se sigue sin bloquear la página.
-    if (ESTADOS_EN_CURSO.has(datos.estado)) seguirPedido(datos, sesion);
-  } catch (error) {
-    if (sesion === token) estadoCompra.textContent = error.message;
+    while (true) {
+      try {
+        const { datos } = await solicitar("/api/pedidos", { body: compra, sesion, clave });
+        if (sesion !== token) return;
+        clavesPorCompra.delete(contenido);
+        seguimiento++;
+        estadoCompra.textContent = textoPedido(datos) + (intento > 1 ? " · tras " + intento + " intentos con la misma llave" : "");
+        await Promise.all([cargarCatalogo(), cargarPedidos()]);
+        // 202 PENDIENTE: la compra quedó guardada y la saga sigue en el servidor. Se sigue sin bloquear la página.
+        if (ESTADOS_EN_CURSO.has(datos.estado)) seguirPedido(datos, sesion);
+        return;
+      } catch (error) {
+        if (sesion !== token) return;
+        const temporal = esFallaTemporal(error);
+        if (!temporal || Date.now() - inicio >= LIMITE_REINTENTO_MS) {
+          // La llave se conserva: si el usuario vuelve a presionar "Comprar", no se crea una compra doble.
+          estadoCompra.textContent = error.message
+            + (temporal ? " · Pedidos sigue sin responder. Vuelve a intentar: se usará la misma llave y no se cobrará doble." : "");
+          return;
+        }
+        estadoCompra.textContent = "Pedidos no responde ("
+          + (error.status ? "HTTP " + error.status : "sin conexión")
+          + "); reintentando con la misma llave · intento " + intento + "…";
+        intento++;
+        await esperar(ESPERA_REINTENTO_MS);
+        if (sesion !== token) return;
+      }
+    }
   } finally {
     comprando = false;
     boton.disabled = false;
