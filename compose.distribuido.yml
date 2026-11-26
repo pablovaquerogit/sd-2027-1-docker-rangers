@@ -74,7 +74,9 @@ services:
   gateway:
     image: nginx:1.27.5-alpine
     ports: ['127.0.0.1:${PUERTO_DISTRIBUIDO:-18091}:8000']
-    volumes: [./nginx/gateway.conf:/etc/nginx/nginx.conf:ro]
+    volumes:
+      - ./nginx/gateway.conf:/etc/nginx/nginx.conf:ro
+      - ./web:/usr/share/nginx/html:ro
     depends_on:
       usuarios: {condition: service_healthy}
       inventario: {condition: service_healthy}

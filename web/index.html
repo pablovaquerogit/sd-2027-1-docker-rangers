@@ -1,0 +1,77 @@
+<!doctype html>
+<html lang="es-MX">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="color-scheme" content="dark">
+  <title>Docker Rangers | Tienda</title>
+  <link rel="stylesheet" href="/assets/tienda.css">
+  <script src="/assets/tienda.js" defer></script>
+</head>
+<body>
+  <header class="barra">
+    <a class="marca" href="/"><span aria-hidden="true">[DR]</span> Docker Rangers</a>
+    <nav aria-label="Tienda">
+      <a href="#catalogo">Catálogo</a>
+      <a href="#pedidos">Mis pedidos</a>
+    </nav>
+    <button id="sesion" class="secundario" type="button">Iniciar sesión</button>
+  </header>
+
+  <main>
+    <section class="portada" aria-labelledby="titulo">
+      <div>
+        <h1 id="titulo">Tu escritorio,<br><span>bien equipado.</span></h1>
+        <p>Encuentra lo que necesitas y consulta el estado de tu pedido.</p>
+        <a href="#catalogo" class="boton">Ver catálogo <span aria-hidden="true">↓</span></a>
+      </div>
+      <aside class="inventario" aria-label="Información del inventario">
+        <h2>Inventario en vivo</h2>
+        <p id="inventario-estado" role="status">Conectando con el catálogo…</p>
+        <p class="instancia">Réplica <strong id="instancia">—</strong></p>
+        <button id="actualizar" class="secundario" type="button">Actualizar catálogo</button>
+      </aside>
+    </section>
+
+    <section id="catalogo" aria-labelledby="titulo-catalogo">
+      <div class="encabezado"><h2 id="titulo-catalogo">Catálogo</h2><span id="productos-total"></span></div>
+      <div id="productos" class="productos"></div>
+      <p id="compra-estado" role="status"></p>
+    </section>
+
+    <section id="pedidos" aria-labelledby="titulo-pedidos">
+      <div class="encabezado"><h2 id="titulo-pedidos">Mis pedidos</h2>
+        <button id="recargar-pedidos" class="secundario" type="button" hidden>Actualizar pedidos</button>
+      </div>
+      <p id="pedidos-estado" role="status">Inicia sesión para ver tus pedidos.</p>
+      <ul id="lista-pedidos"></ul>
+    </section>
+  </main>
+
+  <dialog id="acceso" aria-labelledby="titulo-acceso">
+    <form id="form-acceso">
+      <div class="encabezado"><h2 id="titulo-acceso">Iniciar sesión</h2>
+        <button id="cerrar" class="secundario" type="button">Cerrar</button>
+      </div>
+      <label id="etiqueta-nombre" hidden>Nombre <input name="nombre" autocomplete="name" maxlength="100"></label>
+      <label>Correo <input type="email" name="correo" autocomplete="username" maxlength="254" required></label>
+      <label>Contraseña <input type="password" name="password" autocomplete="current-password" maxlength="128" required></label>
+      <p id="acceso-estado" role="status"></p>
+      <button id="enviar-acceso" class="boton" type="submit">Entrar</button>
+      <button id="modo-acceso" class="secundario" type="button">Crear cuenta</button>
+    </form>
+  </dialog>
+
+  <template id="ficha">
+    <article class="producto">
+      <p class="existencias"></p>
+      <h3></h3>
+      <p class="precio"></p>
+      <form class="compra">
+        <label>Cantidad <input type="number" name="cantidad" min="1" value="1" required></label>
+        <button class="boton" type="submit">Comprar</button>
+      </form>
+    </article>
+  </template>
+</body>
+</html>

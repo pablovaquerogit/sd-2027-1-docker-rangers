@@ -22,6 +22,8 @@ docker compose -f compose.distribuido.yml up --build -d --wait
 
 Entrada: http://localhost:18091/api/productos · salud de Pedidos: http://localhost:18091/health.
 
+La vista de la tienda está en [http://localhost:18091/](http://localhost:18091/). Desde ahí puedes consultar el catálogo, registrar una cuenta de prueba, hacer una compra y actualizar la lista de pedidos. El panel de Inventario muestra qué réplica atendió la última consulta del catálogo. La sesión dura mientras la página siga abierta.
+
 Solo el gateway publica un puerto, enlazado a localhost. Cambiarlo con `PUERTO_DISTRIBUIDO=18092`. Las claves predeterminadas son de desarrollo local: configurar `DB_PASSWORD` e `INTERNAL_KEY` para otro entorno antes de crear sus volúmenes. No hay despliegue público ni TLS en esta demo. Detener conservando las bases: `docker compose -f compose.distribuido.yml down`.
 
 ## Ramas y documentación
@@ -74,4 +76,4 @@ Es una demo local con un único host, gateway, MongoDB y base por servicio: las 
 
 Las reservas permanecen embebidas en el documento del producto para deduplicar: el límite de 16 MB y su crecimiento requieren una estrategia de retención o rediseño antes de producción. No se borran marcas de pedidos todavía reintentables. No hay TTL automático de reservas: una devolución automática sin coordinar con Pedidos podría vender stock de un pedido ya confirmado. Si se pierde definitivamente la base de Pedidos, hace falta conciliación de reservas y respaldos, no basta con un reintento.
 
-Se conservan precios y nombres congelados al reservar; dinero en enteros. Los tokens vencen en ocho horas y se guardan como hash. No hay pagos reales ni mock de cobro, envíos, recuperación de contraseña, administración del catálogo, interfaz web, broker/Outbox o trazas OpenTelemetry. Sí hay logs estructurados y propagación de `X-Request-ID`. Un estado REVISION_PENDIENTE requiere conciliación manual; no se esconde como éxito.
+Se conservan precios y nombres congelados al reservar; dinero en enteros. Los tokens vencen en ocho horas y se guardan como hash. No hay pagos reales ni mock de cobro, envíos, recuperación de contraseña, administración del catálogo, broker/Outbox o trazas OpenTelemetry. Sí hay logs estructurados y propagación de `X-Request-ID`. Un estado REVISION_PENDIENTE requiere conciliación manual; no se esconde como éxito.
