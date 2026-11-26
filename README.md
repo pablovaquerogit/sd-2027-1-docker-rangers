@@ -70,6 +70,16 @@ La prueba pasa si todas las consultas devuelven HTTP 200, la réplica activa ati
 
 En la primera ejecución, una consulta devolvió HTTP 504 al intentar llegar a la réplica detenida. Se agregó un reintento interno en el gateway para los errores 502 y 504 del catálogo. Después del cambio, las 16 consultas durante la caída respondieron HTTP 200 desde la otra réplica. Al volver a levantar la primera, el tráfico se repartió otra vez. [Salida de la prueba](evidencia/prueba-replica-inventario.txt) · [Documentación de Nginx](https://nginx.org/en/docs/http/ngx_http_core_module.html#error_page).
 
+### Cierre de sesión
+
+`DELETE /api/sesiones` borra el token en Usuarios. Desde ese momento el mismo token recibe 401 también en Pedidos, porque Pedidos verifica cada petición contra Usuarios. Cerrar una sesión que ya no existe también responde 204, así que repetirlo es seguro. La web llama a este endpoint al presionar "Cerrar sesión".
+
+```sh
+python3 tests/cerrar_sesion.py
+```
+
+[Salida de la prueba](evidencia/prueba-cerrar-sesion.txt) · [Captura del DELETE 204](evidencia/cerrar-sesion-network.png)
+
 ## Límites que hay que defender
 
 Es una demo local con un único host, gateway, MongoDB y base por servicio: las réplicas de API **no** dan alta disponibilidad de los datos. MongoDB se eligió para practicar reservas atómicas por documento y un catálogo documental; no se midió que sea más rápido que PostgreSQL. No hay transacción global: catálogo, reservas y pedido pueden verse en estados intermedios.

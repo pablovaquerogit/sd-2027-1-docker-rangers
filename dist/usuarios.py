@@ -2,7 +2,7 @@ import hashlib, hmac, secrets
 from uuid import uuid4
 from typing import Annotated
 from datetime import datetime, timedelta, timezone
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, Response
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 from pydantic import BaseModel, Field
 from sqlalchemy import text
@@ -66,6 +66,18 @@ def iniciar_sesion(login: Login):
         c.execute(text('INSERT INTO sesiones(token_hash,usuario_id,expira_en) VALUES (:token,:usuario,:expira)'),
                   dict(token=hashlib.sha256(token.encode()).hexdigest(), usuario=usuario['id'], expira=expira))
     return dict(access_token=token, token_type='bearer', expires_at=expira)
+
+@router.delete('/sesiones', status_code=204)
+def cerrar_sesion(auth: Annotated[HTTPAuthorizationCredentials | None, Depends(bearer)]):
+    # Borra la sesión del servidor: desde ese momento el token recibe 401 en Usuarios y en Pedidos,
+    # porque Pedidos verifica cada petición contra /api/usuarios/me. Es idempotente: cerrar una
+    # sesión que ya no existe (o un token desconocido) también responde 204.
+    if auth is None:
+        raise HTTPException(401, 'Se requiere sesión', headers={'WWW-Authenticate':'Bearer'})
+    token_hash = hashlib.sha256(auth.credentials.encode()).hexdigest()
+    with engine.begin() as c:
+        c.execute(text('DELETE FROM sesiones WHERE token_hash=:hash'), {'hash':token_hash})
+    return Response(status_code=204)
 
 @router.get('/usuarios/me')
 def perfil(usuario=Depends(usuario_actual)):

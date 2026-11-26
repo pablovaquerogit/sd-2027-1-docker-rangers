@@ -1,0 +1,17 @@
+﻿Cierre de sesi¾n À http://localhost:18091
+  [OK ] Registrar usuario: HTTP 201 (esperado 201)
+  [OK ] Iniciar sesi¾n: HTTP 200 (esperado 200)
+Con la sesi¾n abierta
+  [OK ] Perfil en Usuarios: HTTP 200 (esperado 200)
+  [OK ] Mis pedidos en Pedidos: HTTP 200 (esperado 200)
+Cerrar sesi¾n
+  [OK ] DELETE /api/sesiones sin token: HTTP 401 (esperado 401)
+  [OK ] DELETE /api/sesiones: HTTP 204 (esperado 204)
+Con el mismo token despuÚs de cerrar
+  [OK ] Perfil en Usuarios: HTTP 401 (esperado 401)
+  [OK ] Mis pedidos en Pedidos: HTTP 401 (esperado 401)
+  [OK ] Cerrar otra vez (idempotente): HTTP 204 (esperado 204)
+Una sesi¾n nueva sigue funcionando
+  [OK ] Iniciar sesi¾n de nuevo: HTTP 200 (esperado 200)
+  [OK ] Perfil con el token nuevo: HTTP 200 (esperado 200)
+APROBADA: el token cerrado ya no sirve en Usuarios ni en Pedidos.

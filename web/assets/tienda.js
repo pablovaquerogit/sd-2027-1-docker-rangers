@@ -189,18 +189,39 @@ formularioAcceso.addEventListener("submit", async (evento) => {
   }
 });
 
-botonSesion.addEventListener("click", () => {
-  if (!token) {
-    abrirAcceso();
-    return;
+async function cerrarSesion() {
+  const sesion = token;
+  let aviso = "";
+  botonSesion.disabled = true;
+  try {
+    // Se invalida el token en el servidor, no solo en el navegador.
+    const respuesta = await fetch("/api/sesiones", {
+      method: "DELETE",
+      headers: { Authorization: "Bearer " + sesion },
+    });
+    if (!respuesta.ok && respuesta.status !== 401) {
+      aviso = "No se pudo cerrar la sesión en el servidor (HTTP " + respuesta.status + "); vence sola en 8 horas.";
+    }
+  } catch (error) {
+    aviso = "No se pudo contactar al servidor; la sesión vence sola en 8 horas.";
+  } finally {
+    botonSesion.disabled = false;
   }
   token = "";
   clavesPorCompra.clear();
   botonSesion.textContent = "Iniciar sesión";
   actualizarPedidos.hidden = true;
-  estadoCompra.textContent = "";
+  estadoCompra.textContent = aviso;
   pedidos.replaceChildren();
   buscar("#pedidos-estado").textContent = "Inicia sesión para ver tus pedidos.";
+}
+
+botonSesion.addEventListener("click", () => {
+  if (!token) {
+    abrirAcceso();
+    return;
+  }
+  cerrarSesion();
 });
 
 buscar("#cerrar").addEventListener("click", () => acceso.close());
