@@ -1,0 +1,11 @@
+Caída de Pedidos · http://localhost:18091
+Producto de prueba caida-66d2e3ae con stock 5; llave 6e6d9e18…
+Se mata el proceso de Pedidos (kill 1) y se intenta comprar mientras está caído
+  Intentos con la misma llave: 7 en 30.0 s → 3 × HTTP 502, 3 × HTTP 504, 1 × HTTP 201
+  [OK ] Hubo al menos un intento fallido mientras Pedidos estaba caído
+  [OK ] La compra terminó aceptada al volver Pedidos: HTTP 201
+  [OK ] El pedido quedó CONFIRMADO: CONFIRMADO
+  [OK ] Docker reinició Pedidos solo (restart: unless-stopped): reinicios 3 → 4, estado running
+  [OK ] Hay un solo pedido para esa compra: 1 pedido(s)
+  [OK ] El stock bajó una sola vez: 5 → 4
+APROBADA: Pedidos volvió solo y la compra se hizo una sola vez con la misma llave.
