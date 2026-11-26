@@ -1,0 +1,17 @@
+Caída de Usuarios · http://localhost:18091
+Producto de prueba usuarios-2236130f con stock 5; llave d3a08e95…
+Con Usuarios apagado (docker compose stop usuarios)
+  [OK ] El catálogo sigue respondiendo (Inventario no depende de Usuarios): HTTP 200
+  [OK ] Comprar: Pedidos no puede verificar la sesión (503): HTTP 503 No se pudo verificar la sesión
+  [OK ] Iniciar sesión no está disponible: HTTP 504
+  [OK ] Consultar pedidos tampoco (503): HTTP 503
+Se vuelve a encender Usuarios (docker compose start usuarios)
+  [OK ] Iniciar sesión vuelve a funcionar: en 2.2 s
+  [OK ] La misma compra, con la misma llave, se acepta al volver: HTTP 201
+  [OK ] El pedido quedó CONFIRMADO: CONFIRMADO
+  [OK ] Hay un solo pedido para esa compra: 1 pedido(s)
+  [OK ] El stock bajó una sola vez: 5 → 4
+Caída real del proceso (kill 1)
+  [OK ] Docker reinició Usuarios solo (restart: unless-stopped): reinicios 0 → 1, estado running
+  [OK ] Iniciar sesión vuelve a funcionar sin intervención: en 2.1 s
+APROBADA: sin Usuarios no se compra ni se inicia sesión, pero el catálogo sigue; al volver, la misma llave crea un solo pedido y Docker lo reinicia solo.

@@ -25,7 +25,7 @@ const esperar = (ms) => new Promise((listo) => setTimeout(listo, ms));
 // MISMA Idempotency-Key: si la primera petición sí llegó a guardarse, el servidor devuelve ese mismo
 // pedido en lugar de crear otro.
 const ESPERA_REINTENTO_MS = 2000;
-const LIMITE_REINTENTO_MS = 60 * 1000;
+const LIMITE_REINTENTO_MS = 3 * 60 * 1000;
 const esFallaTemporal = (error) => !error.status || [502, 503, 504].includes(error.status);
 
 // Pedidos responde 503 "No se pudo verificar la sesión" cuando el que no contesta es Usuarios.
