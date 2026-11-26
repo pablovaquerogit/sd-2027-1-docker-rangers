@@ -13,6 +13,14 @@ let token = "";
 let registro = false;
 let comprando = false;
 
+// Seguimiento de un pedido que quedó en proceso (202 PENDIENTE): la saga sigue en el servidor
+// y la web pregunta por él hasta que termina.
+const ESTADOS_EN_CURSO = new Set(["PENDIENTE", "COMPENSANDO"]);
+const ESPERA_SEGUIMIENTO_MS = 2000;
+const LIMITE_SEGUIMIENTO_MS = 3 * 60 * 1000;
+let seguimiento = 0;
+const esperar = (ms) => new Promise((listo) => setTimeout(listo, ms));
+
 async function solicitar(url, { body, sesion = "", clave = "" } = {}) {
   const headers = { Accept: "application/json" };
   if (body) headers["Content-Type"] = "application/json";
@@ -111,6 +119,41 @@ async function cargarPedidos() {
   }
 }
 
+function textoPedido(pedido) {
+  return "Pedido " + pedido.id.slice(0, 8) + " · " + pedido.estado
+    + (pedido.motivo ? " · " + pedido.motivo : "");
+}
+
+async function seguirPedido(pedido, sesion) {
+  // Cada seguimiento tiene su turno: si empieza otro (nueva compra) o se cierra la sesión, este se detiene.
+  const turno = ++seguimiento;
+  const inicio = Date.now();
+  let actual = pedido;
+  while (ESTADOS_EN_CURSO.has(actual.estado)) {
+    const transcurrido = Date.now() - inicio;
+    if (transcurrido >= LIMITE_SEGUIMIENTO_MS) {
+      estadoCompra.textContent = textoPedido(actual)
+        + " · Sigue en proceso; el sistema lo terminará solo. Revisa «Mis pedidos» más tarde.";
+      return;
+    }
+    estadoCompra.textContent = "Pedido " + actual.id.slice(0, 8) + " · " + actual.estado
+      + " · esperando a Inventario (" + Math.round(transcurrido / 1000) + " s)"
+      + (actual.motivo ? " · último intento: " + actual.motivo : "") + "…";
+    await esperar(ESPERA_SEGUIMIENTO_MS);
+    if (turno !== seguimiento || sesion !== token) return;
+    try {
+      const { datos } = await solicitar("/api/pedidos/" + actual.id, { sesion });
+      actual = datos;
+    } catch (error) {
+      // Falla de red o de Pedidos al consultar: no cambia el pedido; se vuelve a preguntar en la siguiente vuelta.
+    }
+    if (turno !== seguimiento || sesion !== token) return;
+    cargarPedidos();
+  }
+  estadoCompra.textContent = textoPedido(actual);
+  await Promise.all([cargarCatalogo(), cargarPedidos()]);
+}
+
 async function comprar(producto, cantidad, boton) {
   if (!token) {
     abrirAcceso();
@@ -132,9 +175,11 @@ async function comprar(producto, cantidad, boton) {
     });
     if (sesion !== token) return;
     clavesPorCompra.delete(contenido);
-    estadoCompra.textContent = "Pedido " + datos.id.slice(0, 8) + " · " + datos.estado
-      + (datos.motivo ? " · " + datos.motivo : "");
+    seguimiento++;
+    estadoCompra.textContent = textoPedido(datos);
     await Promise.all([cargarCatalogo(), cargarPedidos()]);
+    // 202 PENDIENTE: la compra quedó guardada y la saga sigue en el servidor. Se sigue sin bloquear la página.
+    if (ESTADOS_EN_CURSO.has(datos.estado)) seguirPedido(datos, sesion);
   } catch (error) {
     if (sesion === token) estadoCompra.textContent = error.message;
   } finally {
@@ -208,6 +253,7 @@ async function cerrarSesion() {
     botonSesion.disabled = false;
   }
   token = "";
+  seguimiento++;
   clavesPorCompra.clear();
   botonSesion.textContent = "Iniciar sesión";
   actualizarPedidos.hidden = true;
