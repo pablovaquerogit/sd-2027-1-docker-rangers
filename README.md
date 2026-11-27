@@ -1,6 +1,6 @@
 # Docker Rangers · Tienda en línea
 
-Proyecto de Sistemas Distribuidos 2027-1, grupo 2, FI-UNAM. Registro, sesiones, catálogo y compra directa con control de stock. Esta rama contiene la separación funcional en **Usuarios, Inventario y Pedidos**, con bases propias, gateway y dos réplicas de Inventario.
+Proyecto de Sistemas Distribuidos 2027-1, grupo 2, FI-UNAM. Registro, sesiones, catálogo y compra directa con control de stock. Esta rama reúne la tienda web y la versión distribuida con **Usuarios, Inventario y Pedidos**, bases propias, gateway y dos réplicas de Inventario.
 
 | Integrante | GitHub |
 | --- | --- |
@@ -11,26 +11,29 @@ Proyecto de Sistemas Distribuidos 2027-1, grupo 2, FI-UNAM. Registro, sesiones, 
 
 Profesor: @OscarRuiz21. El trabajo inicial y las pruebas se prepararon por Pablo con apoyo de Codex. Los demás integrantes deben aportar cambios propios y comprenderlos; no se atribuyen contribuciones que aún no ocurrieron.
 
-## Ejecutar
+## Abrir la tienda web
+
+Con Docker en ejecución, usa estos comandos:
 
 ```sh
 git clone https://github.com/pablovaquerogit/sd-2027-1-docker-rangers.git
 cd sd-2027-1-docker-rangers
-git switch 02-separacion
+git switch caida-usuarios
 docker compose -f compose.distribuido.yml up --build -d --wait
 ```
 
-Entrada: http://localhost:18091/api/productos · salud de Pedidos: http://localhost:18091/health.
+Cuando termine el arranque, abre [la tienda en el navegador](http://localhost:18091/). Puedes consultar el catálogo, crear una cuenta de prueba, comprar un producto y ver el estado en **Mis pedidos**. El panel de Inventario muestra qué réplica atendió la última consulta del catálogo. La sesión dura mientras la página siga abierta.
 
-La vista de la tienda está en [http://localhost:18091/](http://localhost:18091/). Desde ahí puedes consultar el catálogo, registrar una cuenta de prueba, hacer una compra y actualizar la lista de pedidos. El panel de Inventario muestra qué réplica atendió la última consulta del catálogo. La sesión dura mientras la página siga abierta.
+[Catálogo por API](http://localhost:18091/api/productos) · [Salud de Pedidos](http://localhost:18091/health).
 
 Solo el gateway publica un puerto, enlazado a localhost. Cambiarlo con `PUERTO_DISTRIBUIDO=18092`. Las claves predeterminadas son de desarrollo local: configurar `DB_PASSWORD` e `INTERNAL_KEY` para otro entorno antes de crear sus volúmenes. No hay despliegue público ni TLS en esta demo. Detener conservando las bases: `docker compose -f compose.distribuido.yml down`.
 
 ## Ramas y documentación
 
-- `main`: presentación y PRD.
+- `main`: PRD, reporte final y documentación.
 - `01-monolito`: FastAPI modular con una base PostgreSQL; siete pruebas aprobadas.
-- `02-separacion`: tres servicios con datos propios y saga recuperable. Conserva también el código monolítico para comparar; el Compose distribuido ejecuta `dist/`.
+- `02-separacion`: primera versión con tres servicios, bases propias y saga recuperable.
+- `caida-usuarios`: demo con la tienda web y las pruebas de recuperación. El Compose distribuido ejecuta `dist/`.
 
 [PRD](docs/PRD.md) · [Decisiones y diagrama](docs/DECISIONES.md) · [Pitch, demo y defensa](docs/DEMO-Y-DEFENSA.md).
 
