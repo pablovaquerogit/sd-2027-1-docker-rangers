@@ -1,0 +1,221 @@
+Docker Rangers
+
+Guion de exposición para cuatro participantes
+
+Versión preparada el 26 de noviembre de 2026. Referencia técnica: caida-usuarios, commit ee71ef7. Reparto sugerido para ensayar, no un acuerdo previo del equipo.
+
+Reparto y duración
+
+Derek Santana: diapositivas 1–3. Presentación, problema y alcance. Aproximadamente 2 min 30 s.
+
+José Pablo Vaquero: diapositivas 4–6. Arquitectura, saga y decisiones. Aproximadamente 3 min 5 s.
+
+Josué Hernández: diapositivas 7–9. Interfaz, recorrido de compra y evidencia de Inventario. Aproximadamente 2 min 35 s.
+
+Claudia Alin Rojas: diapositivas 10–12. Sesiones, recuperación y cierre. Aproximadamente 2 min 55 s.
+
+Tiempo previsto: unos 11 minutos de explicación más 5–7 minutos de demo. Los tiempos son una propuesta de ensayo. Si el profesor limita la exposición, usar el pitch breve y dedicar el resto a la demo. Todos deben comprender el sistema completo.
+
+Antes de exponer
+
+Confirmar que la versión ejecutada coincide con ee71ef7 o actualizar los cambios. Levantar Docker con anticipación, comprobar http://localhost:18091/ y preparar una cuenta de prueba. No ejecutar simultáneamente varias pruebas de caída. No mostrar tokens, contraseñas ni datos personales.
+
+Cómo usar este guion
+
+Cada apartado corresponde al mismo número de diapositiva. Leerlo primero y después explicarlo con palabras propias. Las pruebas descritas provienen de archivos de evidencia del equipo. Si no se repiten durante la exposición, decir “la evidencia registrada muestra” y abrir el archivo correspondiente.
+
+Diapositivas 1 y 2
+
+1. Docker Rangers
+
+Derek Santana · Tiempo orientativo: 45 s
+
+Buenas tardes. Somos Docker Rangers: Claudia Alin Rojas, Josué Hernández, José Pablo Vaquero y Derek Santana. Nuestro proyecto es una tienda con registro, catálogo y compra directa. El problema central aparece cuando varias personas quieren la última unidad o cuando la red falla y alguien repite una compra. Queremos conservar el stock correcto y recuperar el resultado sin generar otra operación. Presentaremos el alcance, la arquitectura, la experiencia web y las pruebas de recuperación.
+
+Apoyo: README.md y docs/PRD.md
+
+2. El problema de una compra incierta
+
+Derek Santana · Tiempo orientativo: 55 s
+
+Pensemos en dos clientes que intentan comprar la última unidad. Consultar el stock y descontarlo en operaciones separadas puede permitir que ambos compren. Además, que el cliente vea un error de red no demuestra que la compra haya fallado: Inventario pudo haber reservado antes de perderse la respuesta. Por eso distinguimos entre una compra rechazada y una compra cuyo resultado todavía es incierto. Conservamos una identidad estable para repetir el intento y consultar su estado. La documentación explica estos casos y relaciona cada comportamiento con su evidencia.
+
+Apoyo: docs/DECISIONES.md; dist/inventario_app.py; dist/pedidos_app.py
+
+Diapositivas 3 y 4
+
+3. Alcance de la versión presentada
+
+Derek Santana · Tiempo orientativo: 50 s
+
+La versión revisada permite registrar usuarios, iniciar y cerrar sesión, consultar el catálogo, comprar y seguir el estado del pedido. Tenemos una interfaz web y una API. El entorno funciona localmente con Docker Compose. Delimitamos el alcance: todavía no implementamos pagos, envíos ni un despliegue productivo. Este material corresponde al commit ee71ef7, que reúne la separación de servicios y las mejoras de interfaz y recuperación. El equipo debe ejecutar esa versión o ajustar el material antes de presentar. Ahora Pablo explicará cómo dividimos el sistema y cómo coordinamos una compra.
+
+Apoyo: README.md; compose.distribuido.yml; web/; commit ee71ef7
+
+4. Arquitectura y propiedad de los datos
+
+José Pablo Vaquero · Tiempo orientativo: 60 s
+
+Partimos de un monolito con una transacción PostgreSQL y después separamos Usuarios, Pedidos e Inventario. El gateway recibe las llamadas del navegador. Usuarios conserva cuentas y sesiones en su PostgreSQL. Pedidos conserva la intención de compra y su progreso en otra base. Las dos instancias de Inventario comparten MongoDB. Pedidos consulta Usuarios para validar la sesión y llama al balanceador interno para reservar. DNS de Compose descubre direcciones y Nginx reparte las solicitudes. Cada servicio tiene su responsabilidad de datos, pero las llamadas entre servicios pueden fallar independientemente.
+
+Apoyo: compose.distribuido.yml; nginx/; docs/DECISIONES.md
+
+Diapositivas 5 y 6
+
+5. La compra como saga persistida
+
+José Pablo Vaquero · Tiempo orientativo: 65 s
+
+La compra comienza guardando la intención como PENDIENTE antes de llamar a Inventario. Después se reservan los productos. Si todas las reservas terminan, el pedido queda CONFIRMADO. Si un producto no tiene stock, guardamos COMPENSANDO antes de liberar las reservas anteriores y terminar como RECHAZADO. Si hay un timeout, desconocemos el resultado remoto y mantenemos el trabajo pendiente. El trabajador recupera el progreso persistido incluso después de reiniciar Pedidos. No tenemos una transacción global entre PostgreSQL y MongoDB, por eso existen estados intermedios y compensaciones que también deben poder repetirse.
+
+Apoyo: dist/pedidos_app.py; docs/DECISIONES.md
+
+6. Decisiones y costos
+
+José Pablo Vaquero · Tiempo orientativo: 60 s
+
+Tomamos cuatro decisiones principales. Primero, la llave de idempotencia dura más que una petición: repetir usuario, llave y contenido recupera la misma compra, mientras otro contenido produce conflicto. Segundo, Inventario actualiza el stock y la marca de reserva en una operación atómica por producto. Tercero, elegimos una saga persistida frente a coordinar todo en memoria, con el costo de manejar estados intermedios. Cuarto, usamos DNS de Compose y Nginx en lugar de otro servicio de descubrimiento. Esto simplifica la demo, pero seguimos dependiendo de un solo host. Josué mostrará cómo se reflejan estas decisiones en la tienda.
+
+Apoyo: docs/DECISIONES.md; dist/inventario_app.py; dist/pedidos_app.py
+
+Diapositivas 7 y 8
+
+7. La experiencia de compra en la web
+
+Josué Hernández · Tiempo orientativo: 50 s
+
+La interfaz permite recorrer el negocio sin escribir cada solicitud a mano. El usuario consulta el catálogo, inicia sesión y compra. Después puede revisar sus pedidos. El panel de Inventario muestra qué instancia respondió la última consulta. Esa información ayuda a observar el balanceo de la demo. La interfaz comunica el estado que devuelve la API: si el pedido está pendiente, todavía no anunciamos una confirmación. Para el equipo también es importante conservar la llave de la operación cuando repetimos una compra tras un problema de red.
+
+Apoyo: web/; README.md
+
+8. Demo de la compra y su repetición
+
+Josué Hernández · Tiempo orientativo: 45 s + demo
+
+Durante la demo abriremos la tienda y usaremos una cuenta de prueba. Primero mostraremos el catálogo y una compra confirmada. Después, con la API o la prueba preparada, repetiremos exactamente la misma llave y el mismo contenido para comprobar que devuelve el mismo pedido y no vuelve a descontar. Al cambiar el contenido conservando la llave esperamos un conflicto 409. La interfaz sirve para el recorrido del usuario y la prueba automatizada para observar las solicitudes precisas. Antes de iniciar la parte de fallas comprobaremos que nadie más esté ejecutando pruebas contra los mismos contenedores.
+
+Apoyo: README.md; tests/distribuido.py; docs/DEMO-Y-DEFENSA.md
+
+Diapositivas 9 y 10
+
+9. Concurrencia y caída de una réplica
+
+Josué Hernández · Tiempo orientativo: 60 s
+
+Las evidencias guardadas muestran diez intentos por tres unidades: tres compras confirmadas, siete rechazadas y stock final cero. Cinco solicitudes simultáneas con la misma llave produjeron un pedido y un descuento. También detuvimos una réplica de Inventario. La primera ejecución registró un 504. Después de ajustar la recuperación del catálogo en el gateway, las dieciséis consultas durante la caída respondieron 200 desde la otra instancia. Estos resultados describen esas ejecuciones, no garantizan disponibilidad universal. Ambas instancias dependen del mismo MongoDB. Alin explicará ahora la recuperación de Usuarios y Pedidos.
+
+Apoyo: evidencia/pruebas-distribuidas.json; evidencia/prueba-replica-inventario.txt
+
+10. Sesiones y pedidos pendientes
+
+Claudia Alin Rojas · Tiempo orientativo: 55 s
+
+Cerrar sesión llama a DELETE de sesiones y revoca el token en Usuarios. Pedidos valida cada petición contra Usuarios, por lo que ese token también deja de servir para consultar pedidos. La prueba registra 204 al cerrar y 401 al reutilizar el token. Repetir el cierre vuelve a responder 204. Otra mejora consiste en seguir los pedidos pendientes desde la web hasta que la saga termine. Un 202 indica que el trabajo existe, pero su resultado todavía no es definitivo. El usuario debe consultar ese pedido o reintentar con la misma llave, sin convertir el problema de red en una compra nueva.
+
+Apoyo: evidencia/prueba-cerrar-sesion.txt; web/; commit 7fb8d26
+
+Diapositivas 11 y 12
+
+11. Recuperación de Usuarios y Pedidos
+
+Claudia Alin Rojas · Tiempo orientativo: 65 s
+
+Al provocar la caída de Pedidos, la prueba registrada hizo siete intentos en treinta segundos con la misma llave. Hubo tres respuestas 502, tres 504 y finalmente un 201. Docker reinició el proceso y terminamos con un solo pedido confirmado y un descuento, de cinco a cuatro unidades. Cuando cae Usuarios, el catálogo sigue respondiendo porque no depende de ese servicio. En cambio, Pedidos devuelve 503 al no poder validar la sesión y el inicio de sesión tampoco está disponible. Cuando Usuarios vuelve, la misma compra puede continuar. Estos resultados muestran recuperación con interrupciones observables, no continuidad perfecta.
+
+Apoyo: evidencia/prueba-caida-pedidos.txt; evidencia/prueba-caida-usuarios.txt
+
+12. Límites y siguientes pasos
+
+Claudia Alin Rojas · Tiempo orientativo: 55 s
+
+Para cerrar, reconocemos los límites. El host, el gateway y cada base siguen siendo puntos únicos de falla. Las reservas embebidas necesitan una política de retención segura para que el historial no crezca indefinidamente. Antes de producción debemos probar respaldos y restauración, facilitar la conciliación y mejorar observabilidad y seguridad. No basta con agregar más instancias de API. Nuestro resultado principal es una compra que conserva su identidad y puede recuperarse tras fallas sin repetir el descuento en los escenarios registrados. Con esto concluimos la explicación y podemos pasar a la demo o a las preguntas.
+
+Apoyo: docs/DECISIONES.md; README.md
+
+Demo compartida de 5–7 minutos
+
+0:00–0:45 · Derek. Abrir la tienda y situar el escenario: compra normal, repetición y recuperación. Nombrar la versión que está ejecutándose.
+
+0:45–1:30 · Pablo. Mostrar contenedores y explicar quién guarda cada dato. Identificar gateway, dos API de Inventario y bases separadas.
+
+1:30–3:00 · Josué. Registrar o usar una cuenta de prueba, consultar catálogo y comprar. Para demostrar idempotencia, usar una solicitud preparada con la misma llave o la evidencia de tests/distribuido.py. Verificar mismo ID y stock, no solo el mensaje de la interfaz.
+
+3:00–5:00 · Alin. Mostrar cierre de sesión y token revocado. Elegir una sola prueba de recuperación: python3 tests/caida_pedidos.py. Identificar errores temporales, reinicio y un solo pedido confirmado. El tiempo de recuperación puede variar.
+
+5:00–6:00 · Josué y Pablo. Mostrar la evidencia de caída de Inventario y la concurrencia. Si ya se ejecutaron las pruebas antes, indicar que es una salida registrada. No lanzar toda la batería si el tiempo es corto.
+
+6:00–7:00 · Derek y Alin. Relacionar resultados con el problema inicial y cerrar con límites y siguientes pasos.
+
+Si la demo falla
+
+Describir el error observado sin afirmar éxito. Conservar la llave de la compra y consultar su estado antes de repetir. Si no hay tiempo para recuperar, mostrar las evidencias del repositorio como ejecuciones previas y explicar qué se esperaba. No fabricar una respuesta ni presentar una captura antigua como ejecución actual.
+
+Arranque de la versión documentada
+
+git switch --detach ee71ef7
+
+docker compose -f compose.distribuido.yml up --build -d --wait
+
+Abrir http://localhost:18091/
+
+Preguntas para preparar la defensa
+
+¿Por qué 202 no confirma la compra?
+
+Porque la intención está registrada, pero alguna operación remota sigue sin resultado definitivo. Consultamos el pedido o repetimos con la misma llave.
+
+¿Qué pasa si Inventario descuenta y se pierde la respuesta?
+
+El reintento conserva pedido y producto como identidad de reserva. Inventario recupera la reserva existente y evita un segundo descuento.
+
+¿Qué protege la actualización atómica?
+
+La condición de stock, el descuento y la marca de reserva de un producto. No cubre todos los productos ni la base de Pedidos.
+
+¿Por qué usar una saga?
+
+Porque los servicios guardan datos en bases distintas. Persistimos pasos y compensaciones para recuperarnos sin una transacción global.
+
+¿Qué pasa si falla la compensación?
+
+El estado COMPENSANDO permanece guardado y la liberación idempotente puede retomarse. Los casos que requieren conciliación no se anuncian como éxito.
+
+¿Dos réplicas significan alta disponibilidad?
+
+Mejoran la continuidad ante la caída de una API, pero comparten MongoDB. Las bases, gateway y host siguen siendo puntos únicos de falla.
+
+¿Qué hace DNS y qué hace Nginx?
+
+DNS descubre direcciones de servicios. Nginx distribuye solicitudes entre destinos y actualiza su resolución.
+
+¿Por qué no expiran automáticamente las reservas?
+
+Una devolución por reloj podría liberar stock de una compra ya confirmada. La retención y conciliación requieren coordinación.
+
+¿Qué aporta cada participante?
+
+Pablo: base técnica y separación. Josué: interfaz y prueba de réplica. Alin: sesiones y recuperación. Derek: documentación, diagramas y consolidación de evidencias. Estas atribuciones corresponden al historial revisado.
+
+Pitch breve y fuentes
+
+Pitch de aproximadamente un minuto
+
+Docker Rangers es una tienda con registro, catálogo y compra directa. Resolvemos dos problemas: que dos clientes compren la última unidad y que un reintento descuente dos veces. Partimos de un monolito y separamos Usuarios, Inventario y Pedidos. Guardamos la intención antes de reservar y conservamos una llave estable para recuperar cada compra. Si un producto se rechaza, compensamos las reservas anteriores. Si el resultado es incierto, dejamos el pedido pendiente y un trabajador retoma el progreso. La evidencia registrada incluye concurrencia, solicitudes duplicadas y recuperación tras caídas. El costo son estados intermedios y más trabajo de operación. La demo sigue dependiendo de un solo host y de bases únicas.
+
+Fuentes verificables
+
+Repositorio: https://github.com/pablovaquerogit/sd-2027-1-docker-rangers
+
+Referencia: commit ee71ef7, rama caida-usuarios. Documentación general adicional: main f33e90f. Revisar README.md, docs/PRD.md, docs/DECISIONES.md y docs/DEMO-Y-DEFENSA.md.
+
+evidencia/pruebas-distribuidas.json
+
+evidencia/prueba-replica-inventario.txt
+
+evidencia/prueba-cerrar-sesion.txt
+
+evidencia/prueba-caida-pedidos.txt
+
+evidencia/prueba-caida-usuarios.txt
+
+Material preparado con asistencia de IA a partir del repositorio. Las pruebas citadas no se ejecutaron de nuevo al elaborar la presentación. Confirmar la rama final y ensayar el reparto antes de exponer.
