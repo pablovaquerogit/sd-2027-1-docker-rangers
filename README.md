@@ -15,23 +15,27 @@ Profesor: @OscarRuiz21. Las invitaciones están enviadas y requieren aceptación
 
 | Rama | Contenido |
 | --- | --- |
-| main | Presentación, PRD y documentación |
+| `main` | PRD, reporte final y documentación |
 | [01-monolito](https://github.com/pablovaquerogit/sd-2027-1-docker-rangers/tree/01-monolito) | Monolito modular FastAPI/PostgreSQL, Compose y siete pruebas aprobadas |
 | [02-separacion](https://github.com/pablovaquerogit/sd-2027-1-docker-rangers/tree/02-separacion) | Usuarios, Inventario y Pedidos con bases propias, gateway, balanceo y saga persistida; pruebas HTTP de concurrencia, compensación y reinicio |
+| [caida-usuarios](https://github.com/pablovaquerogit/sd-2027-1-docker-rangers/tree/caida-usuarios) | Demo distribuida con la tienda web de Josué, seguimiento de pedidos y recuperación ante fallas |
 
-[PRD](docs/PRD.md) · [Diagrama y decisiones](docs/DECISIONES.md) · [Pitch, demo y defensa](docs/DEMO-Y-DEFENSA.md).
+[Reporte final (PDF)](docs/reporte-final.pdf) · [PRD](docs/PRD.md) · [Diagrama y decisiones](docs/DECISIONES.md) · [Pitch, demo y defensa](docs/DEMO-Y-DEFENSA.md).
 
-## Ejecutar la versión distribuida
+## Abrir la tienda web
+
+Con Docker en ejecución, usa estos comandos:
 
 ```sh
 git clone https://github.com/pablovaquerogit/sd-2027-1-docker-rangers.git
 cd sd-2027-1-docker-rangers
-git switch 02-separacion
+git switch caida-usuarios
 docker compose -f compose.distribuido.yml up --build -d --wait
-python3 tests/distribuido.py
 ```
 
-API local: http://localhost:18091/api/productos. El README de esa rama contiene el flujo de compra, resultados y límites. El script crea datos ficticios y apaga temporalmente el balanceador interno para probar recuperación. No hay interfaz web ni pagos.
+Cuando termine el arranque, abre [la tienda en el navegador](http://localhost:18091/). Puedes consultar el catálogo, crear una cuenta de prueba, comprar un producto y ver el estado en **Mis pedidos**. [Catálogo por API](http://localhost:18091/api/productos).
+
+Para verificar la versión distribuida, ejecuta `python3 tests/distribuido.py` con la tienda levantada. La prueba crea datos ficticios y detiene temporalmente el balanceador interno para comprobar la recuperación. Ejecútala fuera de la demo.
 
 Para el monolito: cambiar a `01-monolito` y ejecutar `docker compose up --build -d --wait`. Documentación interactiva en http://localhost:18090/docs. Su Compose usa otro proyecto y bases; no migra los datos a la versión distribuida.
 
